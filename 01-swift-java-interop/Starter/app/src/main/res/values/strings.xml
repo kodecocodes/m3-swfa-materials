@@ -1,0 +1,14 @@
+<resources>
+  <string name="app_name">Task Manager</string>
+  <string name="add_task">Add Task</string>
+  <string name="task_title">Title</string>
+  <string name="task_description">Description</string>
+  <string name="task_priority">Priority</string>
+  <string name="task_due_date">Due Date</string>
+  <string name="save">Save</string>
+  <string name="cancel">Cancel</string>
+  <string name="high_priority">High</string>
+  <string name="medium_priority">Medium</string>
+  <string name="low_priority">Low</string>
+  <string name="no_tasks">No tasks yet. Tap + to create one!</string>
+</resources>

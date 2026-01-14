@@ -287,3 +287,20 @@ DerivedData/
 
 ## Gcc Patch
 /*.gcno
+
+
+############################################################
+# Swift                                                    #
+############################################################
+
+# Swift Package Manager build folder
+.build/
+.swiftpm/
+
+
+############################################################
+# Project-specific                                         #
+############################################################
+
+# Scratch folder for temporary documentation
+scratch/
