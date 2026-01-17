@@ -78,26 +78,16 @@ swift --version
 Install the Swift SDK for Android using swiftly:
 
 ```bash
-swiftly install 6.3-snapshot
-
-# Install Android SDK for different architectures
-swift sdk install \
-  https://download.swift.org/swift-6.3-branch/androidv7-ndk27/swift-6.3-DEVELOPMENT-SNAPSHOT-2025-01-08-a/swift-6.3-DEVELOPMENT-SNAPSHOT-2025-01-08-a-android-27-ndk27-armv7.artifactbundle.tar.gz
-
-swift sdk install \
-  https://download.swift.org/swift-6.3-branch/androidv8/swift-6.3-DEVELOPMENT-SNAPSHOT-2025-01-08-a/swift-6.3-DEVELOPMENT-SNAPSHOT-2025-01-08-a-android-28-ndk27-aarch64.artifactbundle.tar.gz
-
-swift sdk install \
-  https://download.swift.org/swift-6.3-branch/androidx64/swift-6.3-DEVELOPMENT-SNAPSHOT-2025-01-08-a/swift-6.3-DEVELOPMENT-SNAPSHOT-2025-01-08-a-android-28-ndk27-x86_64.artifactbundle.tar.gz
+swift sdk install https://download.swift.org/swift-6.3-branch/android-sdk/swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-16-a/swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-16-a_android.artifactbundle.tar.gz --checksum 080da5553cdd12d286f715d86527089e7c924093733f8f4e1195f2bd2137d45c
 ```
 
-**Note:** Check [swift.org/install](https://www.swift.org/install/) for the latest snapshot URLs if these links are outdated.
+**Note:** Check [swift.org/install](https://www.swift.org/install/) for the latest snapshot URL and checksum if this is outdated.
 
 Verify SDK installation:
 
 ```bash
 swift sdk list
-# Should show: aarch64-unknown-linux-android28, armv7-unknown-linux-android28, x86_64-unknown-linux-android28
+# Should show Android SDK targets
 ```
 
 ### Step 4: Set Up Android Studio
