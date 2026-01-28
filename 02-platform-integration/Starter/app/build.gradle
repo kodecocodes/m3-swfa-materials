@@ -167,7 +167,7 @@ Steps to configure:
             
 
             def swiftSdkPath = System.getenv('HOME') + '/Library/org.swift.swiftpm/swift-sdks'
-            def swiftRuntimeLibs = file("${swiftSdkPath}/swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-06-a_android.artifactbundle/swift-android/swift-resources/usr/lib/swift-${arch.swiftArch}/android")
+            def swiftRuntimeLibs = file("${swiftSdkPath}/swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-16-a_android.artifactbundle/swift-android/swift-resources/usr/lib/swift-${arch.swiftArch}/android")
             
             if (swiftRuntimeLibs.exists()) {
 

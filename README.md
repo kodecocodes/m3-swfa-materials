@@ -75,7 +75,7 @@ swift --version
 
 ### Step 3: Install Swift SDK for Android
 
-Install the Swift SDK for Android using swiftly:
+Install the Swift SDK for Android:
 
 ```bash
 swift sdk install https://download.swift.org/swift-6.3-branch/android-sdk/swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-16-a/swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-16-a_android.artifactbundle.tar.gz --checksum 080da5553cdd12d286f715d86527089e7c924093733f8f4e1195f2bd2137d45c
@@ -87,7 +87,7 @@ Verify SDK installation:
 
 ```bash
 swift sdk list
-# Should show Android SDK targets
+# Should show: swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-16-a_android (installed)
 ```
 
 ### Step 4: Set Up Android Studio
@@ -118,7 +118,23 @@ Then reload your shell:
 source ~/.zshrc  # or source ~/.bash_profile
 ```
 
-### Step 5: Clone and Build the Projects
+### Step 5: Link NDK to Swift SDK
+
+**Critical:** After installing both the Swift SDK and Android NDK, run the setup script to link them:
+
+```bash
+cd ~/Library/org.swift.swiftpm || cd ~/.swiftpm
+./swift-sdks/swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-16-a_android.artifactbundle/swift-android/scripts/setup-android-sdk.sh
+```
+
+You should see this success message:
+```
+setup-android-sdk.sh: success: ndk-sysroot linked to Android NDK at android-ndk-r27d/toolchains/llvm/prebuilt
+```
+
+**Why this is needed:** The Swift SDK expects the NDK at a specific symlink path. Without this step, builds will fail with "ndk-sysroot not found" or "semaphore.h not found" errors.
+
+### Step 6: Clone and Build the Projects
 
 1. **Clone the repository:**
 
