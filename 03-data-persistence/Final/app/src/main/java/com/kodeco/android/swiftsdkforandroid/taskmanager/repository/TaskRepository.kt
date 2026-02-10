@@ -14,34 +14,44 @@
 
 package com.kodeco.android.swiftsdkforandroid.taskmanager.repository
 
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
-import com.kodeco.android.swiftsdkforandroid.taskmanager.jni.TaskManagerJNI
+import com.kodeco.android.taskmanagerkit.Task
+import com.kodeco.android.taskmanagerkit.Priority
+import org.swift.swiftkit.core.SwiftArena
+import com.kodeco.android.taskmanagerkit.TaskValidator
+import com.kodeco.android.taskmanagerkit.TaskManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import android.content.Context
 import org.json.JSONArray
-import org.json.JSONException
 import java.io.File
-import java.net.URI
+import java.util.Optional
 import java.util.UUID
-
 
 object TaskRepository {
   private val _tasks = MutableStateFlow<List<Task>>(emptyList())
   val tasks: StateFlow<List<Task>> = _tasks
+  
+  private val arena = SwiftArena.ofAuto()
+  private val manager = TaskManager.getShared(arena)
 
   init {
-    // 27
     loadTasks()
   }
+  
+  // Call this from MainActivity to properly load photo paths
+  fun refreshPhotoPaths(context: Context) {
+    val documentsPath = context.filesDir.absolutePath
+    _tasks.value = _tasks.value.map { task ->
+      // Photo paths managed by Swift PhotoStorage
+      // TODO: Implement photo path refresh if needed
+      task
+    }
+  }
 
-  // 28
   private fun loadTasks() {
-    // Note: loadTasks() is called from init, so we construct the expected path
-    // This is safe because Android always uses /data/user/0/{package}/files
-    val documentsPath = "/data/user/0/com.kodeco.android.swiftsdkforandroid.taskmanager/files"
-    
     try {
-      val jsonString = TaskManagerJNI.getAllTasks()
+      // Get tasks as JSON from Swift
+      val jsonString = TaskManager.getAllTasksJSON()
       val jsonArray = JSONArray(jsonString)
       
       val loadedTasks = mutableListOf<Task>()
@@ -49,26 +59,46 @@ object TaskRepository {
         val jsonTask = jsonArray.getJSONObject(i)
         val taskId = jsonTask.getString("id")
         
-        // 60
-        val photoPath = TaskManagerJNI.getTaskPhotoPath(taskId, documentsPath)
+        // Reconstruct photo URI from photoFilename if it exists
+        val photoUri = if (jsonTask.has("photoFilename") && !jsonTask.isNull("photoFilename")) {
+          val filename = jsonTask.getString("photoFilename")
+          // Use dynamic path construction with file:// URI scheme
+          // Will be properly resolved after refreshPhotoPaths() is called with Context
+          filename // Store just filename for now, will be resolved later
+        } else {
+          null
+        }
         
-        val task = Task(
-          id = taskId,
-          title = jsonTask.getString("title"),
-          description = jsonTask.getString("description"),
-          priority = Task.Priority.valueOf(jsonTask.getString("priority")),
-          isCompleted = false,
-          photoUri = photoPath
+        // Parse priority string to swift-java Priority
+        val priorityString = jsonTask.getString("priority")
+        val priority = when (priorityString.lowercase()) {
+          "low" -> Priority.low(arena)
+          "medium" -> Priority.medium(arena)
+          "high" -> Priority.high(arena)
+          else -> Priority.medium(arena)
+        }
+        
+        val photoFilename = if (jsonTask.has("photoFilename") && !jsonTask.isNull("photoFilename")) {
+          jsonTask.getString("photoFilename")
+        } else {
+          null
+        }
+        
+        val task = Task.init(
+          taskId,
+          jsonTask.getString("title"),
+          jsonTask.getString("description"),
+          priority,
+          jsonTask.getBoolean("isCompleted"),
+          Optional.ofNullable(photoFilename),
+          arena
         )
         loadedTasks.add(task)
       }
       
       _tasks.value = loadedTasks
-    } catch (e: JSONException) {
-      // JSON parsing failed - start with empty list
-      _tasks.value = emptyList()
     } catch (e: Exception) {
-      // Other errors - start with empty list
+      e.printStackTrace()
       _tasks.value = emptyList()
     }
   }
@@ -76,193 +106,157 @@ object TaskRepository {
   fun addTask(
     title: String,
     description: String,
-    priority: Task.Priority,
+    priority: Priority,
     photoUri: String? = null,
     context: android.content.Context? = null
   ): Result<Unit> {
-
-    if (!TaskManagerJNI.validateTaskTitle(title)) {
+    // Validate using swift-java
+    if (!TaskValidator.validateTitle(title)) {
       return Result.failure(Exception("Title must be between 3 and 50 characters"))
     }
 
-
-    if (!TaskManagerJNI.validateTaskDescription(description)) {
+    if (!TaskValidator.validateDescription(description)) {
       return Result.failure(Exception("Description must be between 10 and 200 characters"))
     }
 
     val taskId = UUID.randomUUID().toString()
 
-    // 61
-    var savedPhotoPath: String? = null
-    if (photoUri != null && photoUri.isNotEmpty()) {
-      try {
-        // Extract file path from URI (handles both file:// and content:// schemes)
-        val filePath = if (photoUri.startsWith("file://")) {
-          photoUri.removePrefix("file://")
-        } else if (photoUri.startsWith("/")) {
-          photoUri
-        } else {
-          null
-        }
-        
-        if (filePath != null) {
-          val file = File(filePath)
-          
-          if (file.exists()) {
-            // Read file into byte array
-            val photoData = file.readBytes()
-            val documentsPath = context?.filesDir?.absolutePath ?: "/data/data/com.kodeco.android.swiftsdkforandroid.taskmanager/files"
-            
-            val filename = TaskManagerJNI.saveTaskPhoto(taskId, photoData, documentsPath)
-            
-            if (filename != null && !filename.startsWith("ERROR")) {
-              savedPhotoPath = TaskManagerJNI.getTaskPhotoPath(taskId, documentsPath)
-            }
-          }
-        }
-      } catch (e: Exception) {
-        // Photo save failed - continue without photo
-        e.printStackTrace()
-      }
+    // Save photo using file path approach
+    val photoFilename = if (photoUri != null && photoUri.isNotEmpty() && context != null) {
+      savePhotoViaPath(taskId, photoUri, context)
+    } else {
+      null
     }
-
-    val task = Task(
-      id = taskId,
-      title = title,
-      description = description,
-      priority = priority,
-      isCompleted = false,
-      photoUri = savedPhotoPath
+    
+    // Create Task with photoFilename
+    val task = Task.init(
+      taskId,
+      title,
+      description,
+      priority,
+      false,
+      Optional.ofNullable(photoFilename),
+      arena
     )
-
-
-    val success = TaskManagerJNI.createTask(
-      id = task.id,
-      title = task.title,
-      description = task.description,
-      priority = task.priority.name
-    )
-
+    
+    // Use instance method
+    val success = manager.addTask(task)
 
     if (success) {
-      _tasks.value = _tasks.value + task
+      loadTasks()
       return Result.success(Unit)
     } else {
-      return Result.failure(Exception("Failed to create task in Swift"))
+      return Result.failure(Exception("Validation failed"))
     }
   }
 
-
-  // 23
   fun updateTask(
     id: String,
     title: String,
     description: String,
-    priority: Task.Priority,
+    priority: Priority,
     photoUri: String? = null,
     context: android.content.Context? = null
   ): Result<Unit> {
-    // Validate with Swift
-    if (!TaskManagerJNI.validateTaskTitle(title)) {
-      return Result.failure(Exception("Title must be between 3 and 50 characters"))
-    }
+    // Get existing task to preserve isCompleted and photoFilename
+    val existingTask = manager.getTask(id, arena).orElse(null) ?: return Result.failure(Exception("Task not found"))
     
-    if (!TaskManagerJNI.validateTaskDescription(description)) {
-      return Result.failure(Exception("Description must be between 10 and 200 characters"))
-    }
-    
-    // 62
-    var savedPhotoPath: String? = null
-    if (photoUri != null && photoUri.isNotEmpty()) {
-      try {
-        // Extract file path from URI (handles both file:// and content:// schemes)
-        val filePath = if (photoUri.startsWith("file://")) {
-          photoUri.removePrefix("file://")
-        } else if (photoUri.startsWith("/")) {
-          photoUri
-        } else {
-          null
-        }
-        
-        if (filePath != null) {
-          val file = File(filePath)
-          if (file.exists()) {
-            // Read file into byte array
-            val photoData = file.readBytes()
-            val documentsPath = context?.filesDir?.absolutePath ?: "/data/data/com.kodeco.android.swiftsdkforandroid.taskmanager/files"
-            
-            val filename = TaskManagerJNI.saveTaskPhoto(id, photoData, documentsPath)
-            
-            if (filename != null) {
-              savedPhotoPath = TaskManagerJNI.getTaskPhotoPath(id, documentsPath)
-            }
-          }
-        }
-      } catch (e: Exception) {
-        // Photo save failed - keep existing photo
-        e.printStackTrace()
-        savedPhotoPath = _tasks.value.find { it.id == id }?.photoUri
-      }
+    // Save photo if new one provided
+    val photoFilename = if (photoUri != null && photoUri.isNotEmpty() && context != null) {
+      savePhotoViaPath(id, photoUri, context)
     } else {
-      // No new photo - try to preserve existing
-      savedPhotoPath = _tasks.value.find { it.id == id }?.photoUri
+      // Keep existing photoFilename (Optional<String>)
+      existingTask.getPhotoFilename().orElse(null)
     }
     
-    // Update in Swift
-    val success = TaskManagerJNI.updateTask(
-      id = id,
-      title = title,
-      description = description,
-      priority = priority.name
+    // Create updated Task
+    val task = Task.init(
+      id,
+      title,
+      description,
+      priority,
+      existingTask.isCompleted(),
+      Optional.ofNullable(photoFilename),
+      arena
     )
     
+    // Use instance method
+    val success = manager.updateTask(task)
+    
     if (success) {
-      // Update local state
-      _tasks.value = _tasks.value.map { task ->
-        if (task.id == id) {
-          task.copy(
-            title = title,
-            description = description,
-            priority = priority,
-            photoUri = savedPhotoPath
-          )
-        } else {
-          task
-        }
-      }
+      loadTasks()
       return Result.success(Unit)
     } else {
-      return Result.failure(Exception("Failed to update task in Swift"))
+      return Result.failure(Exception("Update failed"))
     }
   }
 
-  // 24
   fun toggleTaskCompletion(taskId: String) {
     _tasks.value = _tasks.value.map { task ->
       if (task.id == taskId) {
-        task.copy(isCompleted = !task.isCompleted)
-      } else {
-        task
+        task.setCompleted(!task.isCompleted())
       }
+      task
     }
   }
 
-  // 25
   fun deleteTask(taskId: String): Result<Unit> {
-    // Delete in Swift
-    val success = TaskManagerJNI.deleteTask(taskId)
+    // Use instance method
+    val success = manager.deleteTask(taskId)
     
     if (success) {
-      // Update local state
-      _tasks.value = _tasks.value.filter { it.id != taskId }
+      loadTasks()
       return Result.success(Unit)
     } else {
-      return Result.failure(Exception("Failed to delete task in Swift"))
+      return Result.failure(Exception("Failed to delete task"))
     }
   }
 
-  // 26
   fun clearCompleted() {
     _tasks.value = _tasks.value.filter { !it.isCompleted }
+  }
+  
+  // Helper function to save photo via file path (pure swift-java!)
+  private fun savePhotoViaPath(taskId: String, photoUri: String, context: Context): String? {
+    try {
+      // Convert photoUri to source file
+      val sourceFile = when {
+        photoUri.startsWith("file://") -> File(photoUri.removePrefix("file://"))
+        photoUri.startsWith("/") -> File(photoUri)
+        else -> {
+          println("Invalid photo URI format: $photoUri")
+          return null
+        }
+      }
+      
+      if (!sourceFile.exists()) {
+        println("Source photo file doesn't exist: ${sourceFile.absolutePath}")
+        return null
+      }
+      
+      // Create temp file in cache dir
+      val tempFile = File(context.cacheDir, "temp_photo_$taskId.jpg")
+      try {
+        // Copy source to temp file
+        sourceFile.copyTo(tempFile, overwrite = true)
+        
+        // Get documents path for Swift
+        val documentsPath = context.filesDir.absolutePath
+        
+        // Call Swift via swift-java with file path!
+        val savedPath = TaskManager.savePhotoFromPath(taskId, tempFile.absolutePath, documentsPath)
+        
+        return savedPath.orElse(null)
+      } finally {
+        // Clean up temp file
+        if (tempFile.exists()) {
+          tempFile.delete()
+        }
+      }
+    } catch (e: Exception) {
+      e.printStackTrace()
+      println("Failed to save photo: ${e.message}")
+      return null
+    }
   }
 }

@@ -45,16 +45,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
+import com.kodeco.android.taskmanagerkit.Task
+import com.kodeco.android.taskmanagerkit.TaskManager
+import org.swift.swiftkit.core.SwiftArena
 
-// 34
 @Composable
 fun TaskCard(
   task: Task,
   onEdit: (Task) -> Unit = {},
   onDelete: (Task) -> Unit = {}
 ) {
+  // 1
+  val arena = remember { SwiftArena.ofConfined() }
+  val context = LocalContext.current
+  
+  // 2
+  val photoUri = task.getPhotoFilename().orElse(null)?.let { filename ->
+    TaskManager.getShared(arena).getPhotoPath(task.id, context.filesDir.absolutePath)?.get().let { path ->
+      "file://$path"
+    }
+  }
+
   Card(
     modifier = Modifier
       .fillMaxWidth()
@@ -80,11 +94,11 @@ fun TaskCard(
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
       
-      task.photoUri?.let { uri ->
+      if (photoUri != null) {
         Spacer(modifier = Modifier.height(12.dp))
         
         AsyncImage(
-          model = uri,
+          model = photoUri,
           contentDescription = "Task photo",
           modifier = Modifier
             .fillMaxWidth()
@@ -95,16 +109,14 @@ fun TaskCard(
       
       Spacer(modifier = Modifier.height(12.dp))
       
-      // 35
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        PriorityBadge(priority = task.priority.name)
+        PriorityBadge(priority = task.getPriority(arena).rawValue)
         
         Row {
-          // 36
           IconButton(onClick = { onEdit(task) }) {
             Icon(
               imageVector = Icons.Default.Edit,
@@ -112,7 +124,6 @@ fun TaskCard(
             )
           }
           
-          // 69
           IconButton(onClick = { onDelete(task) }) {
             Icon(
               imageVector = Icons.Default.Delete,

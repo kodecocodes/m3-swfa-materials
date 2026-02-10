@@ -26,7 +26,7 @@ Before building these projects, ensure you have:
 - **Android Studio** (Iguana 2023.2.1 or later)
 - **Android SDK** with API Level 34
 - **Android NDK 27**
-- **Java 17** (bundled with Android Studio)
+- **JDK 21** (for daily builds) and **JDK 25** (one-time setup for SwiftKitCore publishing)
 - **Git** for cloning the repository
 
 ### Step 1: Install Swiftly (Swift Toolchain Manager)
@@ -90,7 +90,37 @@ swift sdk list
 # Should show: swift-6.3-DEVELOPMENT-SNAPSHOT-2026-01-16-a_android (installed)
 ```
 
-### Step 4: Set Up Android Studio
+### Step 4: Install JDKs (for swift-java)
+
+**swift-java requires two JDK versions:**
+
+1. **JDK 21** - For all project builds (daily use)
+2. **JDK 25** - For one-time SwiftKitCore publishing
+
+#### Install JDK 21 (Primary)
+
+```bash
+# Using sdkman (recommended)
+sdk install java 21.0.5-tem
+sdk use java 21.0.5-tem
+
+# Set as default
+sdk default java 21.0.5-tem
+
+# Verify
+java -version  # Should show: openjdk version "21.0.5"
+```
+
+#### Install JDK 25 (One-Time Setup)
+
+```bash
+# Using sdkman
+sdk install java 25.0.1-tem
+
+# Or download from: https://jdk.java.net/25/
+```
+
+### Step 5: Set Up Android Studio
 
 1. **Open Android Studio** and install:
    - Android SDK Platform 34
@@ -108,6 +138,8 @@ swift sdk list
 ```bash
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018
+export JAVA_HOME="/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home"
+export PATH=$JAVA_HOME/bin:$PATH
 export PATH=$PATH:$ANDROID_HOME/platform-tools
 export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
 ```
@@ -118,7 +150,37 @@ Then reload your shell:
 source ~/.zshrc  # or source ~/.bash_profile
 ```
 
-### Step 5: Link NDK to Swift SDK
+### Step 6: Publish SwiftKitCore to Maven (One-Time Setup)
+
+**Required for swift-java integration** - this only needs to be done once per machine:
+
+```bash
+# Switch to JDK 25 (required for SwiftKitCore compilation)
+export JAVA_HOME="/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home"
+java -version  # Verify: openjdk version "25.0.1"
+
+# Clone swift-java repository
+cd ~
+git clone https://github.com/swiftlang/swift-java.git
+cd swift-java
+
+# Publish SwiftKitCore to local Maven
+./gradlew :SwiftKitCore:publishToMavenLocal
+
+# Verify publication
+ls ~/.m2/repository/org/swift/swiftkitcore/
+# Should show: 1.0-SNAPSHOT/
+
+# Switch back to JDK 21 for all other builds
+export JAVA_HOME="/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home"
+java -version  # Verify: openjdk version "21.0.5"
+```
+
+**What this does:** Publishes the swift-java core library (SwiftKitCore) to your local Maven repository at `~/.m2/repository`. This is required for JExtractSwiftPlugin to generate Java bindings from Swift code.
+
+**Why JDK 25?** SwiftKitCore requires JDK 25 to compile. After this one-time setup, you'll use JDK 21 for all daily project builds.
+
+### Step 7: Link NDK to Swift SDK
 
 **Critical:** After installing both the Swift SDK and Android NDK, run the setup script to link them:
 
@@ -134,7 +196,7 @@ setup-android-sdk.sh: success: ndk-sysroot linked to Android NDK at android-ndk-
 
 **Why this is needed:** The Swift SDK expects the NDK at a specific symlink path. Without this step, builds will fail with "ndk-sysroot not found" or "semaphore.h not found" errors.
 
-### Step 6: Clone and Build the Projects
+### Step 8: Clone and Build the Projects
 
 1. **Clone the repository:**
 
@@ -152,14 +214,29 @@ cd 01-swift-java-interop/Final
 3. **Build Swift code:**
 
 ```bash
-./gradlew buildSwift
+# Build the Swift library module
+./gradlew :taskmanager-lib:buildSwiftAll
 ```
 
 This task:
 - Compiles Swift for 3 architectures (arm64-v8a, armeabi-v7a, x86_64)
+- **Auto-generates Java wrapper classes** via JExtractSwiftPlugin
 - Generates libTaskManagerKit.so for each architecture
 - Copies all libraries to `app/src/main/jniLibs/`
 - Includes Swift runtime libraries (~28 files per architecture)
+
+**Generated Java classes location:**
+```
+taskmanager-lib/.build/plugins/outputs/taskmanagerkit/TaskManagerKit/JExtractSwiftPlugin/
+└── src/generated/java/
+    ├── Task.java
+    ├── Priority.java
+    ├── TaskValidator.java
+    ├── TaskManager.java
+    └── SwiftArena.java
+```
+
+These classes are **automatically** included in your Android build - no manual imports needed!
 
 4. **Build the Android app:**
 
@@ -179,13 +256,33 @@ Or open the project in Android Studio and click **Run** ▶️
 - **Solution:** Set `ANDROID_NDK_HOME` environment variable
 - Verify NDK is installed: `ls $ANDROID_HOME/ndk/`
 
-**Issue:** `buildSwift task fails`
+**Issue:** `Could not find org.swift:swiftkitcore:1.0-SNAPSHOT`
+- **Solution:** Publish SwiftKitCore to Maven (Step 6)
+- Verify publication: `ls ~/.m2/repository/org/swift/swiftkitcore/`
+- Make sure you used JDK 25 for publishing
+
+**Issue:** `Kotlin compiler requires JDK 21` or version errors
+- **Solution:** Ensure you're using JDK 21 for builds:
+  ```bash
+  export JAVA_HOME="/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home"
+  java -version  # Should show 21.0.5
+  ```
+- JDK 25 is only for publishing SwiftKitCore (one-time)
+
+**Issue:** `buildSwiftAll task fails`
 - **Solution:** Check Swift installation: `swift --version`
-- Ensure all 3 Android SDKs are installed: `swift sdk list`
+- Ensure Swift SDK for Android is installed: `swift sdk list`
+- Verify JDK 21 is active: `java -version`
+
+**Issue:** `JExtractSwiftPlugin not generating classes`
+- **Solution:** Verify `swift-java.config` exists in Swift Sources directory
+- Check Package.swift includes swift-java dependency
+- Clean and rebuild: `./gradlew clean :taskmanager-lib:buildSwiftAll`
 
 **Issue:** Build succeeds but app crashes on launch
 - **Solution:** Verify correct libraries are in `jniLibs/` folders
 - Check that Swift runtime libraries were copied (should be ~29 files per architecture)
+- Verify generated Java classes exist in `.build/plugins/outputs/`
 
 ### Testing on Device/Emulator
 
@@ -200,24 +297,52 @@ Or open the project in Android Studio and click **Run** ▶️
 ```
 m3-swfa-materials/
 ├── 01-swift-java-interop/
-│   ├── Starter/          # Basic Android UI, no Swift integration
-│   └── Final/            # Complete with Swift validation
-├── 02-platform-integration/
-│   ├── Starter/          # Copy of Lesson 1 Final (clean)
-│   └── Final/            # + Camera + Swift image processing
-├── 03-data-persistence/
-│   ├── Starter/          # Copy of Lesson 2 Final (clean)
-│   └── Final/            # + Persistence + CRUD operations
-├── images/               # Screenshots and assets
-├── scratch/              # Development documentation
-└── README.md            # This file
+│   ├── Starter/
+│   │   ├── taskmanager-lib/        # Swift library module
+│   │   │   ├── build.gradle.kts    # Swift build + JExtract config
+│   │   │   ├── Package.swift       # Swift dependencies (includes swift-java)
+│   │   │   ├── gradle.properties
+│   │   │   └── Sources/TaskManagerKit/
+│   │   │       ├── Task.swift
+│   │   │       ├── TaskManager.swift
+│   │   │       ├── TaskValidator.swift
+│   │   │       └── swift-java.config  # JExtract configuration
+│   │   ├── app/                    # Android app module
+│   │   │   ├── build.gradle.kts    # Depends on :taskmanager-lib
+│   │   │   └── src/main/
+│   │   │       ├── java/           # Kotlin UI code
+│   │   │       └── jniLibs/        # Generated .so files
+│   │   ├── build.gradle.kts        # Root build config
+│   │   └── settings.gradle.kts     # Multi-module declaration
+│   └── Final/                      # (same structure)
+├── 02-platform-integration/        # (same structure + image processing)
+├── 03-data-persistence/            # (same structure + persistence)
+├── images/                         # Screenshots and assets
+├── scratch/                        # Development documentation
+└── README.md                       # This file
 ```
 
-Each project contains:
-- **TaskManagerKit/** - Swift package with business logic
-- **app/** - Android app with Kotlin/Compose UI
-- **build.gradle** - Custom buildSwift task configuration
-- **README.md** - Project-specific documentation
+**Multi-Module Architecture:**
+
+Each project uses a **multi-module Gradle structure**:
+
+- **taskmanager-lib/** - Swift library module
+  - Compiles Swift code for Android
+  - Uses **JExtractSwiftPlugin** to auto-generate Java bindings
+  - Produces `.so` libraries and Java wrapper classes
+  - No manual JNI exports needed!
+
+- **app/** - Android app module
+  - Kotlin/Compose UI
+  - Imports auto-generated Java classes from `taskmanager-lib`
+  - Uses type-safe Swift APIs through generated wrappers
+
+**Key Files:**
+
+- **Package.swift** - Swift dependencies (includes swift-java package)
+- **swift-java.config** - Configures Java package name and JNI mode
+- **build.gradle.kts** - Gradle build with JExtractSwiftPlugin
+- **settings.gradle.kts** - Declares both modules (`app`, `taskmanager-lib`)
 
 ---
 
@@ -229,8 +354,9 @@ After completing all three lessons, your Task Manager app will feature:
 
 **Lesson 1: Swift-Java Interoperability**
 - Swift-based validation for task titles (3-50 characters) and descriptions (10-200 characters)
-- Bidirectional JNI communication between Kotlin and Swift
-- Type-safe data marshaling across language boundaries
+- **swift-java auto-generated bindings** for type-safe Swift-Kotlin interop
+- **Zero manual JNI code** - JExtractSwiftPlugin generates Java wrappers automatically
+- **SwiftArena memory management** for proper object lifecycle
 
 **Lesson 2: Platform Integration**
 - Camera capture using CameraX
@@ -249,6 +375,8 @@ After completing all three lessons, your Task Manager app will feature:
 ### App Highlights:
 
 - **Hybrid Architecture**: Swift handles business logic and validation, Kotlin handles UI
+- **swift-java Integration**: Auto-generated type-safe bindings, zero manual JNI
+- **Multi-Module Design**: Clean separation between Swift library and Android app
 - **Production Patterns**: Repository pattern, singleton managers, proper error handling
 - **Modern UI**: Material Design 3 with Jetpack Compose
 - **Real-World Integration**: Demonstrates practical Swift SDK for Android usage

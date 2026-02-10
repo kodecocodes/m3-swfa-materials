@@ -38,6 +38,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -52,7 +53,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.kodeco.android.swiftsdkforandroid.taskmanager.R
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
+import com.kodeco.android.taskmanagerkit.Priority
+import org.swift.swiftkit.core.SwiftArena
 import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.ImageProcessingRepository
 import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.TaskRepository
 import kotlinx.coroutines.Dispatchers
@@ -67,16 +69,17 @@ import java.io.FileOutputStream
 fun CreateTaskDialog(
   onDismiss: () -> Unit
 ) {
+  val arena = remember { SwiftArena.ofConfined() }
 
   var title by remember { mutableStateOf("") }
   var description by remember { mutableStateOf("") }
-  var priority by remember { mutableStateOf(Task.Priority.Medium) }
+  var priority by remember { mutableStateOf(Priority.medium(arena)) }
   var expanded by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
-  // 16
+  // 1
   var photoUri by remember { mutableStateOf<Uri?>(null) }
   var showCamera by remember { mutableStateOf(false) }
-  // 41
+  // 2
   var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
   var displayedBitmap by remember { mutableStateOf<Bitmap?>(null) }
   var isProcessing by remember { mutableStateOf(false) }
@@ -85,16 +88,22 @@ fun CreateTaskDialog(
   val context = LocalContext.current
   
 
-  val priorities = Task.Priority.values().toList()
+  val priorities = remember(arena) {
+    listOf(
+      Priority.low(arena),
+      Priority.medium(arena),
+      Priority.high(arena)
+    )
+  }
   
-  // 17
+  // 3
   if (showCamera) {
     CameraPermissionHandler(
       onPermissionGranted = {
         CameraScreen(
           onPhotoCaptured = { uri ->
             photoUri = uri
-            // 42
+            // 4
             originalBitmap = loadBitmapFromUri(context, uri)
             displayedBitmap = originalBitmap
             showCamera = false
@@ -152,13 +161,13 @@ fun CreateTaskDialog(
         ) {
 
           OutlinedTextField(
-            value = priority.name,
+            value = priority.rawValue,
             onValueChange = {},
             readOnly = true,
             label = { Text(stringResource(R.string.task_priority)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-              .menuAnchor()
+              .menuAnchor(MenuAnchorType.PrimaryNotEditable)
               .fillMaxWidth()
           )
           
@@ -170,7 +179,7 @@ fun CreateTaskDialog(
             priorities.forEach { option ->
 
               DropdownMenuItem(
-                text = { Text(option.name) },
+                text = { Text(option.rawValue) },
                 onClick = {
                   priority = option
                   expanded = false
@@ -180,7 +189,7 @@ fun CreateTaskDialog(
           }
         }
         
-        // 18
+        // 5
         Button(
           onClick = { showCamera = true },
           modifier = Modifier.fillMaxWidth()
@@ -193,7 +202,7 @@ fun CreateTaskDialog(
           Text("Add Photo")
         }
         
-        // 19
+        // 6
         displayedBitmap?.let { bitmap ->
           AsyncImage(
             model = bitmap,
@@ -212,14 +221,14 @@ fun CreateTaskDialog(
             )
           }
           
-          // 43
+          // 7
           Row(
             modifier = Modifier
               .fillMaxWidth()
               .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
           ) {
-            // 44
+            // 8
             Button(
               onClick = {
                 displayedBitmap = originalBitmap
@@ -228,7 +237,7 @@ fun CreateTaskDialog(
               Text("Original")
             }
             
-            // 45
+            // 9
             Button(
               onClick = {
                 originalBitmap?.let { original ->
@@ -237,7 +246,8 @@ fun CreateTaskDialog(
                     val result = withContext(Dispatchers.Default) {
                       ImageProcessingRepository.applyFilter(
                         original,
-                        ImageProcessingRepository.FilterType.GRAYSCALE
+                        ImageProcessingRepository.FilterType.GRAYSCALE,
+                        context
                       )
                     }
                     displayedBitmap = result
@@ -250,7 +260,7 @@ fun CreateTaskDialog(
               Text("Grayscale")
             }
             
-            // 46
+            // 10
             Button(
               onClick = {
                 originalBitmap?.let { original ->
@@ -259,7 +269,8 @@ fun CreateTaskDialog(
                     val result = withContext(Dispatchers.Default) {
                       ImageProcessingRepository.applyFilter(
                         original,
-                        ImageProcessingRepository.FilterType.BLUR
+                        ImageProcessingRepository.FilterType.BLUR,
+                        context
                       )
                     }
                     displayedBitmap = result
@@ -272,7 +283,7 @@ fun CreateTaskDialog(
               Text("Blur")
             }
             
-            // 47
+            // 11
             Button(
               onClick = {
                 originalBitmap?.let { original ->
@@ -281,8 +292,8 @@ fun CreateTaskDialog(
                     val result = withContext(Dispatchers.Default) {
                       ImageProcessingRepository.applyFilter(
                         original,
-                        ImageProcessingRepository.FilterType.BRIGHTNESS,
-                        amount = 30f
+                        ImageProcessingRepository.FilterType.BRIGHTER,
+                        context
                       )
                     }
                     displayedBitmap = result
@@ -295,7 +306,7 @@ fun CreateTaskDialog(
               Text("Brighter")
             }
             
-            // 48
+            // 12
             Button(
               onClick = {
                 originalBitmap?.let { original ->
@@ -304,8 +315,8 @@ fun CreateTaskDialog(
                     val result = withContext(Dispatchers.Default) {
                       ImageProcessingRepository.applyFilter(
                         original,
-                        ImageProcessingRepository.FilterType.BRIGHTNESS,
-                        amount = -30f
+                        ImageProcessingRepository.FilterType.DARKER,
+                        context
                       )
                     }
                     displayedBitmap = result
@@ -334,14 +345,14 @@ fun CreateTaskDialog(
 
       Button(
         onClick = {
-          // 49
+          // 13
           val finalUri = if (displayedBitmap != null && displayedBitmap != originalBitmap) {
             saveBitmapAndGetUri(context, displayedBitmap!!)
           } else {
             photoUri
           }
 
-          // 20
+          // 14
           val result = TaskRepository.addTask(
             title = title,
             description = description,
@@ -371,19 +382,49 @@ fun CreateTaskDialog(
   )
 }
 
-// 50
+// 15
 private fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
   return try {
-    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+    val bitmap = context.contentResolver.openInputStream(uri)?.use { inputStream ->
       BitmapFactory.decodeStream(inputStream)
-    }
+    } ?: return null
+    
+    correctBitmapOrientation(context, uri, bitmap)
   } catch (e: Exception) {
     e.printStackTrace()
     null
   }
 }
 
-// 51
+private fun correctBitmapOrientation(context: Context, uri: Uri, bitmap: Bitmap): Bitmap {
+  return try {
+    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+      val exif = ExifInterface(inputStream)
+      val orientation = exif.getAttributeInt(
+        ExifInterface.TAG_ORIENTATION,
+        ExifInterface.ORIENTATION_NORMAL
+      )
+      
+      when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> rotateBitmap(bitmap, 90f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> rotateBitmap(bitmap, 180f)
+        ExifInterface.ORIENTATION_ROTATE_270 -> rotateBitmap(bitmap, 270f)
+        else -> bitmap
+      }
+    } ?: bitmap
+  } catch (e: Exception) {
+    e.printStackTrace()
+    bitmap
+  }
+}
+
+private fun rotateBitmap(bitmap: Bitmap, degrees: Float): Bitmap {
+  val matrix = android.graphics.Matrix()
+  matrix.postRotate(degrees)
+  return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+}
+
+// 16
 private fun saveBitmapAndGetUri(context: Context, bitmap: Bitmap): Uri? {
   return try {
     val photoDir = context.getExternalFilesDir("photos") ?: return null

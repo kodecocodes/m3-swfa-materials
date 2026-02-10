@@ -16,30 +16,28 @@ package com.kodeco.android.swiftsdkforandroid.taskmanager.ui
 
 import android.Manifest
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.google.accompanist.permissions.shouldShowRationale
 
-// 12
+// 1
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CameraPermissionHandler(
   onPermissionGranted: @Composable () -> Unit,
   onPermissionDenied: @Composable () -> Unit
 ) {
-  // 13
+  // 2
   val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
   
-  // 14
+  // 3
   LaunchedEffect(Unit) {
     if (!cameraPermissionState.status.isGranted) {
       cameraPermissionState.launchPermissionRequest()
     }
   }
   
-  // 15
+  // 4
   when {
     cameraPermissionState.status.isGranted -> {
       onPermissionGranted()

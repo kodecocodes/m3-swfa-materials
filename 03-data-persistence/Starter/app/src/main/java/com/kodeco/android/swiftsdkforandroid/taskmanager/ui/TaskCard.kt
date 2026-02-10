@@ -43,14 +43,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
 // TODO: Add Alignment import for edit button layout
+import androidx.compose.runtime.remember
 import coil.compose.AsyncImage
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
+import com.kodeco.android.taskmanagerkit.Task
+import org.swift.swiftkit.core.SwiftArena
 
 @Composable
 fun TaskCard(
   task: Task
   // TODO: Add onEdit callback parameter
 ) {
+  val arena = remember { SwiftArena.ofConfined() }
   Card(
     modifier = Modifier
       .fillMaxWidth()
@@ -76,7 +79,10 @@ fun TaskCard(
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
       
-      task.photoUri?.let { uri ->
+      // TODO: In this lesson, photoUri will become photoFilename
+      //  and it'll resolve to actual file paths via PhotoStorage
+      if (task.photoUri.isPresent) {
+        val uri = task.photoUri.get()
         Spacer(modifier = Modifier.height(12.dp))
         
         AsyncImage(
@@ -92,7 +98,7 @@ fun TaskCard(
       Spacer(modifier = Modifier.height(12.dp))
       
       // TODO: Add Row with priority badge and edit button
-      PriorityBadge(priority = task.priority.name)
+      PriorityBadge(priority = task.getPriority(arena).rawValue)
     }
   }
 }

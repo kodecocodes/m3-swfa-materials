@@ -41,24 +41,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kodeco.android.swiftsdkforandroid.taskmanager.R
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
+import com.kodeco.android.taskmanagerkit.Task
+import com.kodeco.android.taskmanagerkit.Priority
 import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.TaskRepository
+import org.swift.swiftkit.core.SwiftArena
 
-// 1
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateTaskDialog(
   onDismiss: () -> Unit
 ) {
+  // 1
+  val arena = remember { SwiftArena.ofConfined() }
+  
   // 2
   var title by remember { mutableStateOf("") }
   var description by remember { mutableStateOf("") }
-  var priority by remember { mutableStateOf(Task.Priority.Medium) }
+  var priority by remember { mutableStateOf(Priority.medium(arena)) }
   var expanded by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
   
   // 3
-  val priorities = Task.Priority.values().toList()
+  val priorities = remember(arena) {
+    listOf(
+      Priority.low(arena),
+      Priority.medium(arena),
+      Priority.high(arena)
+    )
+  }
   
   // 5
   AlertDialog(
@@ -101,13 +111,13 @@ fun CreateTaskDialog(
         ) {
           // 11
           OutlinedTextField(
-            value = priority.name,
+            value = priority.rawValue,
             onValueChange = {},
             readOnly = true,
             label = { Text(stringResource(R.string.task_priority)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-              .menuAnchor()
+              .menuAnchor(MenuAnchorType.PrimaryNotEditable)
               .fillMaxWidth()
           )
           
@@ -119,7 +129,7 @@ fun CreateTaskDialog(
             priorities.forEach { option ->
               // 13
               DropdownMenuItem(
-                text = { Text(option.name) },
+                text = { Text(option.rawValue) },
                 onClick = {
                   priority = option
                   expanded = false

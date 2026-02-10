@@ -38,6 +38,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -52,7 +53,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.kodeco.android.swiftsdkforandroid.taskmanager.R
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
+import com.kodeco.android.taskmanagerkit.Task
+import com.kodeco.android.taskmanagerkit.Priority
+import org.swift.swiftkit.core.SwiftArena
 import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.ImageProcessingRepository
 import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.TaskRepository
 import kotlinx.coroutines.Dispatchers
@@ -65,24 +68,17 @@ import java.io.FileOutputStream
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateTaskDialog(
-  // TODO: Add editTask parameter for edit mode
   onDismiss: () -> Unit
 ) {
-  // TODO: Detect edit mode
+  val arena = remember { SwiftArena.ofConfined() }
 
-  // TODO: Pre-populate fields in edit mode
-  
   var title by remember { mutableStateOf("") }
   var description by remember { mutableStateOf("") }
-  var priority by remember { mutableStateOf(Task.Priority.Medium) }
+  var priority by remember { mutableStateOf(Priority.medium(arena)) }
   var expanded by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
-  
-  // TODO: Load existing photo in edit mode
   var photoUri by remember { mutableStateOf<Uri?>(null) }
   var showCamera by remember { mutableStateOf(false) }
-  
-  // TODO: Load existing photo bitmap in edit mode
   var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
   var displayedBitmap by remember { mutableStateOf<Bitmap?>(null) }
   var isProcessing by remember { mutableStateOf(false) }
@@ -90,8 +86,13 @@ fun CreateTaskDialog(
   val coroutineScope = rememberCoroutineScope()
   val context = LocalContext.current
   
-
-  val priorities = Task.Priority.values().toList()
+  val priorities = remember(arena) {
+    listOf(
+      Priority.low(arena),
+      Priority.medium(arena),
+      Priority.high(arena)
+    )
+  }
   
   if (showCamera) {
     CameraPermissionHandler(
@@ -119,7 +120,6 @@ fun CreateTaskDialog(
   AlertDialog(
     onDismissRequest = onDismiss,
     title = {
-      // TODO: Make title dynamic based on edit mode
 
       Text(text = stringResource(R.string.add_task))
     },
@@ -157,13 +157,13 @@ fun CreateTaskDialog(
         ) {
 
           OutlinedTextField(
-            value = priority.name,
+            value = priority.rawValue,
             onValueChange = {},
             readOnly = true,
             label = { Text(stringResource(R.string.task_priority)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-              .menuAnchor()
+              .menuAnchor(MenuAnchorType.PrimaryNotEditable)
               .fillMaxWidth()
           )
           
@@ -175,7 +175,7 @@ fun CreateTaskDialog(
             priorities.forEach { option ->
 
               DropdownMenuItem(
-                text = { Text(option.name) },
+                text = { Text(option.rawValue) },
                 onClick = {
                   priority = option
                   expanded = false
@@ -237,7 +237,8 @@ fun CreateTaskDialog(
                     val result = withContext(Dispatchers.Default) {
                       ImageProcessingRepository.applyFilter(
                         original,
-                        ImageProcessingRepository.FilterType.GRAYSCALE
+                        ImageProcessingRepository.FilterType.GRAYSCALE,
+                        context
                       )
                     }
                     displayedBitmap = result
@@ -258,7 +259,8 @@ fun CreateTaskDialog(
                     val result = withContext(Dispatchers.Default) {
                       ImageProcessingRepository.applyFilter(
                         original,
-                        ImageProcessingRepository.FilterType.BLUR
+                        ImageProcessingRepository.FilterType.BLUR,
+                        context
                       )
                     }
                     displayedBitmap = result
@@ -279,8 +281,8 @@ fun CreateTaskDialog(
                     val result = withContext(Dispatchers.Default) {
                       ImageProcessingRepository.applyFilter(
                         original,
-                        ImageProcessingRepository.FilterType.BRIGHTNESS,
-                        amount = 30f
+                        ImageProcessingRepository.FilterType.BRIGHTER,
+                        context
                       )
                     }
                     displayedBitmap = result
@@ -301,8 +303,8 @@ fun CreateTaskDialog(
                     val result = withContext(Dispatchers.Default) {
                       ImageProcessingRepository.applyFilter(
                         original,
-                        ImageProcessingRepository.FilterType.BRIGHTNESS,
-                        amount = -30f
+                        ImageProcessingRepository.FilterType.DARKER,
+                        context
                       )
                     }
                     displayedBitmap = result
@@ -337,8 +339,6 @@ fun CreateTaskDialog(
             photoUri
           }
 
-          // TODO: Handle both create and edit modes - call updateTask in edit mode
-          
           val result = TaskRepository.addTask(
             title = title,
             description = description,
@@ -370,13 +370,43 @@ fun CreateTaskDialog(
 
 private fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
   return try {
-    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+    val bitmap = context.contentResolver.openInputStream(uri)?.use { inputStream ->
       BitmapFactory.decodeStream(inputStream)
-    }
+    } ?: return null
+    
+    correctBitmapOrientation(context, uri, bitmap)
   } catch (e: Exception) {
     e.printStackTrace()
     null
   }
+}
+
+private fun correctBitmapOrientation(context: Context, uri: Uri, bitmap: Bitmap): Bitmap {
+  return try {
+    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+      val exif = ExifInterface(inputStream)
+      val orientation = exif.getAttributeInt(
+        ExifInterface.TAG_ORIENTATION,
+        ExifInterface.ORIENTATION_NORMAL
+      )
+      
+      when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> rotateBitmap(bitmap, 90f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> rotateBitmap(bitmap, 180f)
+        ExifInterface.ORIENTATION_ROTATE_270 -> rotateBitmap(bitmap, 270f)
+        else -> bitmap
+      }
+    } ?: bitmap
+  } catch (e: Exception) {
+    e.printStackTrace()
+    bitmap
+  }
+}
+
+private fun rotateBitmap(bitmap: Bitmap, degrees: Float): Bitmap {
+  val matrix = android.graphics.Matrix()
+  matrix.postRotate(degrees)
+  return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 }
 
 private fun saveBitmapAndGetUri(context: Context, bitmap: Bitmap): Uri? {

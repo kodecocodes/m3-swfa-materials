@@ -14,8 +14,10 @@
 
 package com.kodeco.android.swiftsdkforandroid.taskmanager.repository
 
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
-import com.kodeco.android.swiftsdkforandroid.taskmanager.jni.TaskManagerJNI
+import com.kodeco.android.taskmanagerkit.Task
+import com.kodeco.android.taskmanagerkit.Priority
+import org.swift.swiftkit.core.SwiftArena
+import com.kodeco.android.taskmanagerkit.TaskValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.UUID
@@ -24,56 +26,42 @@ import java.util.UUID
 object TaskRepository {
   private val _tasks = MutableStateFlow<List<Task>>(emptyList())
   val tasks: StateFlow<List<Task>> = _tasks
+  
+  private val arena = SwiftArena.ofAuto()
 
-
-  fun addTask(title: String, description: String, priority: Task.Priority): Result<Unit> {
-
-    if (!TaskManagerJNI.validateTaskTitle(title)) {
+  fun addTask(title: String, description: String, priority: Priority): Result<Unit> {
+    // Validate using swift-java
+    if (!TaskValidator.validateTitle(title)) {
       return Result.failure(Exception("Title must be between 3 and 50 characters"))
     }
 
-
-    if (!TaskManagerJNI.validateTaskDescription(description)) {
+    if (!TaskValidator.validateDescription(description)) {
       return Result.failure(Exception("Description must be between 10 and 200 characters"))
     }
 
-
-    val task = Task(
-      id = UUID.randomUUID().toString(),
-      title = title,
-      description = description,
-      priority = priority,
-      isCompleted = false
+    val task = Task.init(
+      UUID.randomUUID().toString(),
+      title,
+      description,
+      priority,
+      false,
+      arena
     )
 
-
-    val success = TaskManagerJNI.createTask(
-      id = task.id,
-      title = task.title,
-      description = task.description,
-      priority = task.priority.name
-    )
-
-
-    if (success) {
-      _tasks.value = _tasks.value + task
-      return Result.success(Unit)
-    } else {
-      return Result.failure(Exception("Failed to create task in Swift"))
-    }
+    // Add task to memory (Lesson 2 Starter: in-memory only)
+    _tasks.value = _tasks.value + task
+    return Result.success(Unit)
   }
 
 
   fun toggleTaskCompletion(taskId: String) {
     _tasks.value = _tasks.value.map { task ->
       if (task.id == taskId) {
-        task.copy(isCompleted = !task.isCompleted)
-      } else {
-        task
+        task.setCompleted(!task.isCompleted())
       }
+      task
     }
   }
-
 
   fun deleteTask(taskId: String) {
     _tasks.value = _tasks.value.filter { it.id != taskId }

@@ -38,12 +38,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
+import com.kodeco.android.taskmanagerkit.Task
+import org.swift.swiftkit.core.SwiftArena
 
 @Composable
 fun TaskCard(task: Task) {
+  val arena = remember { SwiftArena.ofConfined() }
   Card(
     modifier = Modifier
       .fillMaxWidth()
@@ -71,7 +74,7 @@ fun TaskCard(task: Task) {
       
       Spacer(modifier = Modifier.height(12.dp))
       
-      PriorityBadge(priority = task.priority.name)
+      PriorityBadge(priority = task.getPriority(arena).rawValue)
     }
   }
 }

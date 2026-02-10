@@ -31,17 +31,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
-// 4
+// 1
 @Composable
 fun CameraScreen(
   onPhotoCaptured: (Uri) -> Unit,
@@ -50,12 +48,12 @@ fun CameraScreen(
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
   
-  // 5
+  // 2
   val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
   var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
   
   Box(modifier = Modifier.fillMaxSize()) {
-    // 6
+    // 3
     AndroidView(
       factory = { ctx ->
         val previewView = PreviewView(ctx)
@@ -90,14 +88,14 @@ fun CameraScreen(
       modifier = Modifier.fillMaxSize()
     )
     
-    // 7
+    // 4
     Column(
       modifier = Modifier
         .fillMaxSize()
         .padding(16.dp),
       verticalArrangement = Arrangement.SpaceBetween
     ) {
-      // 8
+      // 5
       IconButton(
         onClick = onDismiss,
         modifier = Modifier.align(Alignment.End)
@@ -109,7 +107,7 @@ fun CameraScreen(
         )
       }
       
-      // 9
+      // 6
       FloatingActionButton(
         onClick = {
           capturePhoto(context, imageCapture) { uri ->
@@ -127,7 +125,7 @@ fun CameraScreen(
   }
 }
 
-// 10
+// 7
 private fun capturePhoto(
   context: Context,
   imageCapture: ImageCapture?,
@@ -153,7 +151,7 @@ private fun capturePhoto(
   )
 }
 
-// 11
+// 8
 private fun createPhotoFile(context: Context): File {
   val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
   val photoFileName = "TASK_${timeStamp}.jpg"

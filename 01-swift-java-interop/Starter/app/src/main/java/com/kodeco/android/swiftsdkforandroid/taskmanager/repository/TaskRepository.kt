@@ -14,37 +14,43 @@
 
 package com.kodeco.android.swiftsdkforandroid.taskmanager.repository
 
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
+import com.kodeco.android.taskmanagerkit.Priority
+import com.kodeco.android.taskmanagerkit.Task
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.swift.swiftkit.core.SwiftArena
 import java.util.UUID
 
 object TaskRepository {
   private val _tasks = MutableStateFlow<List<Task>>(emptyList())
   val tasks: StateFlow<List<Task>> = _tasks
 
-  fun addTask(title: String, description: String, priority: Task.Priority): Result<Unit> {
+  val arena = SwiftArena.ofAuto()
+
+  fun addTask(title: String, description: String, priority: Priority): Result<Unit> {
     // TODO: Integrate Swift validation here
 
-    val task = Task(
-      id = UUID.randomUUID().toString(),
-      title = title,
-      description = description,
-      priority = priority,
-      isCompleted = false
+
+    val task = Task.init(
+      UUID.randomUUID().toString(),
+      title,
+      description,
+      priority,
+      false,
+      arena
     )
 
-    _tasks.value = _tasks.value + task
+    _tasks.value += task
     return Result.success(Unit)
   }
 
   fun toggleTaskCompletion(taskId: String) {
     _tasks.value = _tasks.value.map { task ->
       if (task.id == taskId) {
-        task.copy(isCompleted = !task.isCompleted)
-      } else {
-        task
+        // Use the generated setter
+        task.isCompleted = !task.isCompleted
       }
+      task
     }
   }
 

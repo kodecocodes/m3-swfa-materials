@@ -43,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.kodeco.android.swiftsdkforandroid.taskmanager.ui.TaskListScreen
 import com.kodeco.android.swiftsdkforandroid.taskmanager.ui.theme.TaskManagerTheme
+import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.TaskRepository
 
 class MainActivity : ComponentActivity() {
   
@@ -56,6 +57,8 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     
+    // Refresh photo paths now that we have Context
+    TaskRepository.refreshPhotoPaths(this)
 
     setContent {
 

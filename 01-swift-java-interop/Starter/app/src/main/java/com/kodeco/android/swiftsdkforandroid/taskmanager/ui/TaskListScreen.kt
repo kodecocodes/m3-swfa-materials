@@ -44,10 +44,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import com.kodeco.android.swiftsdkforandroid.taskmanager.R
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
 import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.TaskRepository
 
 @OptIn(ExperimentalMaterial3Api::class)

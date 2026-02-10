@@ -41,8 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kodeco.android.swiftsdkforandroid.taskmanager.R
-import com.kodeco.android.swiftsdkforandroid.taskmanager.model.Task
+import com.kodeco.android.taskmanagerkit.Priority
 import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.TaskRepository
+import org.swift.swiftkit.core.SwiftArena
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,16 +51,21 @@ import com.kodeco.android.swiftsdkforandroid.taskmanager.repository.TaskReposito
 fun CreateTaskDialog(
   onDismiss: () -> Unit
 ) {
+  val arena = remember { SwiftArena.ofConfined() }
 
   var title by remember { mutableStateOf("") }
   var description by remember { mutableStateOf("") }
-  var priority by remember { mutableStateOf(Task.Priority.Medium) }
+  var priority by remember { mutableStateOf(Priority.medium(arena)) }
   var expanded by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
   
-
-  val priorities = Task.Priority.values().toList()
-  
+  val priorities = remember(arena) {
+    listOf(
+      Priority.low(arena),
+      Priority.medium(arena),
+      Priority.high(arena)
+    )
+  }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -101,13 +107,13 @@ fun CreateTaskDialog(
         ) {
 
           OutlinedTextField(
-            value = priority.name,
+            value = priority.rawValue,
             onValueChange = {},
             readOnly = true,
             label = { Text(stringResource(R.string.task_priority)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-              .menuAnchor()
+              .menuAnchor(MenuAnchorType.PrimaryNotEditable)
               .fillMaxWidth()
           )
           
@@ -119,7 +125,7 @@ fun CreateTaskDialog(
             priorities.forEach { option ->
 
               DropdownMenuItem(
-                text = { Text(option.name) },
+                text = { Text(option.rawValue) },
                 onClick = {
                   priority = option
                   expanded = false
@@ -155,7 +161,6 @@ fun CreateTaskDialog(
 
             onDismiss()
           }.onFailure { error ->
-
             errorMessage = error.message ?: "Validation failed"
           }
         }
