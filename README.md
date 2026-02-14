@@ -99,6 +99,36 @@ swift sdk list
 
 #### Install JDK 21 (Primary)
 
+First install `sdkman` using homebrew
+
+```bash
+brew tap sdkman/tap
+brew install sdkman-cli
+```
+
+After successful installation add the following lines to the end of your `.bash_profile` or `.zshrc`
+
+```bash
+export SDKMAN_DIR=$(brew --prefix sdkman-cli)/libexec
+[[ -s "${SDKMAN_DIR}/bin/sdkman-init.sh" ]] && source "${SDKMAN_DIR}/bin/sdkman-init.sh"
+```
+
+Open a new terminal and type
+
+```bash
+sdk version
+```
+
+The output should look similar to this
+
+```
+SDKMAN!
+script: 5.19.0
+native: 0.7.4 (macos aarch64)
+```
+
+Next, install JDK 21 with sdkman
+
 ```bash
 # Using sdkman (recommended)
 sdk install java 21.0.5-tem
@@ -128,7 +158,7 @@ sdk install java 25.0.1-tem
    - Android SDK Build-Tools 34.0.0
 
 2. **Configure NDK Path:**
-   - Open **Preferences** → **Appearance & Behavior** → **System Settings** → **Android SDK**
+   - Open **Preferences**, and search for **Android SDK**
    - Go to **SDK Tools** tab
    - Check **NDK (Side by side)**
    - Note the NDK path (typically `~/Library/Android/sdk/ndk/27.2.12479018`)
@@ -168,7 +198,7 @@ cd swift-java
 ./gradlew :SwiftKitCore:publishToMavenLocal
 
 # Verify publication
-ls ~/.m2/repository/org/swift/swiftkitcore/
+ls ~/.m2/repository/org/swift/swiftkit/swiftkit-core/
 # Should show: 1.0-SNAPSHOT/
 
 # Switch back to JDK 21 for all other builds
